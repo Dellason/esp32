@@ -18,7 +18,7 @@ void loop() {
   digitalWrite(RIGHT_REAR, HIGH);
   digitalWrite(RIGHT_FRONT, LOW);
 
-  // LEFT MOTOR: reverse the logic to go forward
+  // LEFT MOTOR
   digitalWrite(LEFT_REAR, LOW);
   digitalWrite(LEFT_FRONT, HIGH);
 
