@@ -21,27 +21,33 @@ void stopMotors() {
 }
 
 void loop() {
-  if (Serial.available() > 0)
-   {
-    char cmd = Serial.read();
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n'); 
+    input.trim(); 
 
-    if (cmd == '\n' || cmd == '\r') {
-      return;
+    if (input.length() == 0) return;
+
+    char cmd = toupper(input.charAt(0));
+    int duration = 0;
+
+    if (input.length() > 1) {
+      duration = input.substring(1).toInt(); 
     }
-
-    cmd = toupper(cmd);
-
     stopMotors();
     
     switch (cmd) {
       case 'F': // Forward
         digitalWrite(LEFT_FORWARD, HIGH);
         digitalWrite(RIGHT_FORWARD, HIGH);
+        if (duration > 0) delay(duration * 1000); 
+        stopMotors();
         break;
 
       case 'B': // Backward
         digitalWrite(LEFT_REVERSE, HIGH);
         digitalWrite(RIGHT_REVERSE, HIGH);
+        if (duration > 0) delay(duration * 1000); 
+        stopMotors();
         break;
 
       case 'L': // Turn Left
