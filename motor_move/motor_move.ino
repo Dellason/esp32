@@ -10,7 +10,7 @@ void setup() {
   pinMode(LEFT_FORWARD, OUTPUT);
   pinMode(RIGHT_REVERSE, OUTPUT);
   pinMode(RIGHT_FORWARD, OUTPUT);
-  serial.Begin(115200);
+  Serial.begin(115200);
 }
 
 void stopMotors() {
@@ -20,40 +20,47 @@ void stopMotors() {
   digitalWrite(RIGHT_REVERSE, LOW);
 }
 
-
 void loop() {
-  //FORWARD
-  digitalWrite(LEFT_FORWARD, HIGH);
-  digitalWrite(RIGHT_FORWARD, HIGH);
-  delay(1000);
+  if (Serial.available() > 0)
+   {
+    char cmd = Serial.read();
 
-  //STOP
-  digitalWrite(LEFT_FORWARD, LOW);
-  digitalWrite(RIGHT_FORWARD, LOW);
-  delay(500);
+    if (cmd == '\n' || cmd == '\r') {
+      return;
+    }
 
-  //REVERSE
-  digitalWrite(LEFT_REVERSE, HIGH);
-  digitalWrite(RIGHT_REVERSE, HIGH);
-  delay(1000);
+    cmd = toupper(cmd);
 
-  //TURN LEFT
-  digitalWrite(RIGHT_FORWARD, HIGH);
-  digitalWrite(LEFT_REVERSE, HIGH);
-  delay(600);
+    stopMotors();
 
-  //STOP
-  digitalWrite(LEFT_REVERSE, LOW);
-  digitalWrite(RIGHT_FORWARD, LOW);
-  delay(500);
+    switch (cmd) {
+      case 'F': // Forward
+        digitalWrite(LEFT_FORWARD, HIGH);
+        digitalWrite(RIGHT_FORWARD, HIGH);
+        break;
 
-   //TURN RIGHT
-  digitalWrite(LEFT_FORWARD, HIGH);
-  digitalWrite(RIGHT_REVERSE, HIGH);
-  delay(500);
+      case 'B': // Backward
+        digitalWrite(LEFT_REVERSE, HIGH);
+        digitalWrite(RIGHT_REVERSE, HIGH);
+        break;
 
-  //STOP
-  digitalWrite(LEFT_FORWARD, LOW);
-  digitalWrite(RIGHT_REVERSE, LOW);
-  delay(1000);
+      case 'L': // Turn Left
+        digitalWrite(LEFT_REVERSE, HIGH);
+        digitalWrite(RIGHT_FORWARD, HIGH);
+        break;
+
+      case 'R': // Turn Right
+        digitalWrite(LEFT_FORWARD, HIGH);
+        digitalWrite(RIGHT_REVERSE, HIGH);
+        break;
+
+      case 'S': // Stop
+        stopMotors();
+        break;
+
+      default:
+        Serial.println("Unknown command. Use F, B, L, R, S.");
+        break;
+    }
+  }
 }
