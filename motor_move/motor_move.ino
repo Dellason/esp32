@@ -32,7 +32,7 @@ void loop() {
     cmd = toupper(cmd);
 
     stopMotors();
-
+    
     switch (cmd) {
       case 'F': // Forward
         digitalWrite(LEFT_FORWARD, HIGH);
