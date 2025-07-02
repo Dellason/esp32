@@ -9,7 +9,7 @@ SERIAL_PORT = '/dev/ttyUSB0'
 BAUD_RATE = 115200
 
 @app.get("/send-command")
-def send_command(cmd: str = "35"):
+def send_command(cmd: str = "F5"):
     try:
         # Open serial connection
         ser = serial.Serial(
