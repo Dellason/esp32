@@ -53,11 +53,15 @@ void loop() {
       case 'L': // Turn Left
         digitalWrite(LEFT_REVERSE, HIGH);
         digitalWrite(RIGHT_FORWARD, HIGH);
+        delay(600);
+        stopMotors();
         break;
 
       case 'R': // Turn Right
         digitalWrite(LEFT_FORWARD, HIGH);
         digitalWrite(RIGHT_REVERSE, HIGH);
+        delay(600);
+        stopMotors();
         break;
 
       case 'S': // Stop
