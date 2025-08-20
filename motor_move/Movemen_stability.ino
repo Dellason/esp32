@@ -1,23 +1,29 @@
 #include <MPU6050_tockn.h>
 #include <Wire.h>
-#include <Math.h>
-#include "helpers.h"
 
-// Motor pins (adjust depending on your wiring)
-const int in1 = 9, in2 = 5, in3 = 4, in4 = 3, led = 13;
+// Motor pins (adjust for your driver)
+const int in1 = 9, in2 = 5, in3 = 6, in4 = 3, led = 13;
 
 float thetaDesired = 0.0f;
-float error_tolerance = 2.80f;
+float error_tolerance = 4.0f; // degrees
 
-long prevT = 0;
-int nominalSpeed = 255;
+char cmd = 's';   // current command
+float buf = 0.0f;      // numeric part of command
+bool gotData = false;
 
 MPU6050 gyro(Wire);
-Command command_u;
 
+// Timing
+unsigned long tripTime = 0;  
+float currentTheta = 0.0f;
+int initAngleZ = 0;
+
+String commandData = "";
+
+// ---------------------- Setup ----------------------
 void setup() {
   delay(1000);
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(in1, OUTPUT);
   pinMode(in2, OUTPUT);
@@ -29,120 +35,113 @@ void setup() {
   gyro.begin();
   gyro.calcGyroOffsets(true);
 
-  digitalWrite(led, HIGH);
-  delay(300);
-  digitalWrite(led, LOW);
-  delay(300);
+  // Blink LED on init
+  digitalWrite(led, HIGH); delay(300);
+  digitalWrite(led, LOW);  delay(300);
   digitalWrite(led, HIGH);
 
-  prevT = micros();
-
-  Serial.println("System ready...");
+  Serial.println("Setup complete.");
 }
 
+// ---------------------- Loop ----------------------
 void loop() {
-  // ✅ Check if a new command arrived
-  if (Serial.available() > 0) {
-    String commandData = Serial.readStringUntil('\n');
-    command_u = parseCommand(commandData);
+  // ---------------- Serial Parsing ----------------
+  while (Serial.available() > 0) {
+    commandData = Serial.readStringUntil('\n');
+    gotData = true;
+    yield();
+  }
 
-    if (command_u.desiredAction != CommandType::NONE &&
-        command_u.desiredAction != CommandType::ERROR) {
+  if (gotData) {
+    if (commandData.length() >= 1) {
+      cmd = commandData[0];
+      if (commandData.length() >= 3) {
+        String subCmd = commandData.substring(1); // everything after cmd
+        buf = subCmd.toFloat();
+      }
+      else buf = 0;
 
-      Serial.print("Executing: ");
-      Serial.println(commandData);
+      tripTime = 0;    // reset timing
+      initAngleZ = 0;  // reset turning state
 
-      doMove(command_u.desiredAction, command_u.SubCommand);
-
-      stopMotors();  // ✅ stop after finishing
-      Serial.println("Command finished");
-    } 
-    else {
-      Serial.println("Unknown/Invalid command received.");
+      Serial.print("Got command: ");
+      Serial.print(cmd);
+      Serial.print(" ");
+      Serial.println(buf);
     }
+    gotData = false;
+  }
+
+  // Always update gyro
+  gyro.update();
+
+  // ---------------- Forward / Backward (time-based) ----------------
+  if (cmd == 'f' || cmd == 'b') {
+    if (tripTime == 0) tripTime = millis();  // mark start time
+    unsigned long elapsed = millis() - tripTime;
+    unsigned long targetTime = (unsigned long)(buf * 1000.0f);          // seconds to ms
+
+    int isFwd = (cmd == 'f');
+    int baseSpeed = 120; // adjust as needed
+
+    // drive both motors forward or backward
+    analogWrite(in1, baseSpeed * !isFwd);
+    analogWrite(in2, baseSpeed * isFwd);
+    analogWrite(in3, baseSpeed * !isFwd);
+    analogWrite(in4, baseSpeed * isFwd);
+
+    if (elapsed >= targetTime) {
+      stopMotors();
+      cmd = 's'; tripTime = 0;
+      Serial.println("Forward/backward complete, stopping.");
+    }
+  }
+
+  // ---------------- Turn Left / Right (angle-based) ----------------
+  else if (cmd == 'l' || cmd == 'r') {
+    if (!initAngleZ) {
+      currentTheta = gyro.getAngleZ();
+      thetaDesired = currentTheta + (cmd == 'r' ? buf : -buf);
+      initAngleZ = 1;
+    }
+
+    double thetaError = thetaDesired - gyro.getAngleZ();
+    int turnSpeed = 120; // 
+
+    if (fabs(thetaError) > error_tolerance) {
+      if (thetaError > 0) {
+        analogWrite(in1, 0);
+        analogWrite(in2, turnSpeed);
+        analogWrite(in3,turnSpeed);
+        analogWrite(in4, 0);
+        }
+
+      else {
+         analogWrite(in1, turnSpeed);
+        analogWrite(in2, 0);
+        analogWrite(in3, 0);
+        analogWrite(in4, turnSpeed);
+      }
+           
+      }
+    
+    else {
+      stopMotors();
+      initAngleZ = 0; cmd = 's';
+      Serial.println("Turn complete, stopping.");
+    }
+  }
+
+  // ---------------- Stop ----------------
+  else {
+    stopMotors();
   }
 }
 
-/* ---------------- MOTOR CONTROL ---------------- */
-
+// ---------------------- Helpers ----------------------
 void stopMotors() {
   digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
   digitalWrite(in3, LOW);
   digitalWrite(in4, LOW);
-}
-
-void doMove(CommandType action, float orientation, int distance = 0) {
-  thetaDesired = orientation;
-
-  // Get orientation from MPU
-  gyro.update();
-  float thetaZ = gyro.getGyroAngleZ();
-
-  double thetaError = thetaDesired - thetaZ;
-
-  // Simple proportional controller
-  double kp = 0.025;
-  double correction = kp * thetaError;
-
-  int baseSpeed = 150;   // enough to move motors
-  int leftSpeed = baseSpeed - correction;
-  int rightSpeed = baseSpeed + correction;
-
-  leftSpeed  = constrain(leftSpeed, 0, 255);
-  rightSpeed = constrain(rightSpeed, 0, 255);
-
-  switch (action) {
-    case CommandType::FORWARD:
-      moveForward(leftSpeed, rightSpeed);
-      break;
-
-    case CommandType::BACKWARD:
-      moveBackward(leftSpeed, rightSpeed);
-      break;
-
-    case CommandType::LEFT:
-      turnInPlace(150, 0); // left
-      delay(orientation * 10); // crude timing
-      break;
-
-    case CommandType::RIGHT:
-      turnInPlace(150, 1); // right
-      delay(orientation * 10);
-      break;
-
-    default:
-      stopMotors();
-      break;
-  }
-}
-
-void moveForward(int lSpeed, int rSpeed) {
-  analogWrite(in1, 0);
-  analogWrite(in2, rSpeed);
-  analogWrite(in3, 0);
-  analogWrite(in4, lSpeed);
-}
-
-void moveBackward(int lSpeed, int rSpeed) {
-  analogWrite(in1, rSpeed);
-  analogWrite(in2, 0);
-  analogWrite(in3, lSpeed);
-  analogWrite(in4, 0);
-}
-
-void turnInPlace(uint8_t speed, uint8_t direction) {
-  if (direction == 0) {
-    // turn left
-    analogWrite(in1, speed);
-    analogWrite(in2, 0);
-    analogWrite(in3, 0);
-    analogWrite(in4, speed);
-  } else {
-    // turn right
-    analogWrite(in1, 0);
-    analogWrite(in2, speed);
-    analogWrite(in3, speed);
-    analogWrite(in4, 0);
-  }
 }
