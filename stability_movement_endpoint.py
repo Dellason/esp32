@@ -10,17 +10,17 @@ BAUD_RATE = 115200
 
 
 @app.get("/send-command")
-def send_command(cmd: str = "F5"):
+def send_command(cmd: str = "F0.5"):
  # Open serial connection
     ser = serial.Serial(
-        port=SERIAL_PORT,
-        baudrate=BAUD_RATE,
-        timeout=1,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-        bytesize=serial.EIGHTBITS
+        port = SERIAL_PORT,
+        baudrate = BAUD_RATE,
+        timeout = 1,
+        parity = serial.PARITY_NONE,
+        stopbits = serial.STOPBITS_ONE,
+        bytesize = serial.EIGHTBITS
     )
-    time.sleep(2)  # Wait for the serial connection to initialize
+    time.sleep(2)  # Wait to initialize serial
 
     try:
         # Send command
@@ -47,14 +47,14 @@ def ping():
 @app.get("/health")
 def health():
     """Check if serial connection is alive"""
-    #Opening port 
+    #Opening port  
     ser = serial.Serial(
-        port=SERIAL_PORT,
-        baudrate=BAUD_RATE,
-        timeout=1,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-        bytesize=serial.EIGHTBITS
+        port = SERIAL_PORT,
+        baudrate = BAUD_RATE,
+        timeout = 1,
+        parity = serial.PARITY_NONE,
+        stopbits = serial.STOPBITS_ONE,
+        bytesize = serial.EIGHTBITS
     )
 
     try:
